@@ -39,6 +39,7 @@ testem.log
 /typings
 __screenshots__/
 /.angular
+src/environments/environment.ts
 
 # System files
 .DS_Store

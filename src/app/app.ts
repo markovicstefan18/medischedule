@@ -7,82 +7,88 @@ import { PatientDetailsComponent } from './components/patient-details/patient-de
 import { PatientHistoryComponent } from './components/patient-history/patient-history.component';
 import { PatientSearchComponent } from './components/patient-search/patient-search.component';
 import { WeekViewComponent } from './components/week-view/week-view.component';
+import { LoginComponent } from './components/login/login.component';
 import { DoctorService } from './services/doctor.service';
 import { AppointmentService } from './services/appointment.service';
+import { AuthService } from './services/auth.service';
 import { Appointment, AppointmentStatus } from './models/appointment.model';
 
 @Component({
   selector: 'app-root',
   standalone: true,
   encapsulation: ViewEncapsulation.None,
-  imports: [NavbarComponent, CalendarComponent, DayViewComponent, AppointmentModalComponent, PatientDetailsComponent, PatientHistoryComponent, PatientSearchComponent, WeekViewComponent],
+  imports: [NavbarComponent, CalendarComponent, DayViewComponent, AppointmentModalComponent, PatientDetailsComponent, PatientHistoryComponent, PatientSearchComponent, WeekViewComponent, LoginComponent],
   template: `
-    <app-navbar (search)="showSearch.set(true)" />
-    <div class="ms-main">
-      <div class="ms-left-panel">
-        <app-calendar
-          [selectedDate]="selectedDate()"
-          [datesWithAppts]="datesWithAppts()"
-          (dateSelected)="selectedDate.set($event)" />
-      </div>
-      <div class="ms-right-panel">
-        <div class="ms-view-toggle">
-          <button class="ms-toggle-btn" [class.active]="viewMode() === 'day'" (click)="viewMode.set('day')">Day</button>
-          <button class="ms-toggle-btn ms-toggle-week" [class.active]="viewMode() === 'week'" (click)="viewMode.set('week')">Week</button>
+    @if (auth.user() === undefined) {
+      <div class="ms-loading">Loading…</div>
+    } @else if (!auth.user()) {
+      <app-login />
+    } @else {
+      <app-navbar (search)="showSearch.set(true)" />
+      <div class="ms-main">
+        <div class="ms-left-panel">
+          <app-calendar
+            [selectedDate]="selectedDate()"
+            [datesWithAppts]="datesWithAppts()"
+            (dateSelected)="selectedDate.set($event)" />
         </div>
-        @if (viewMode() === 'day') {
-          <app-day-view
-            [selectedDate]="selectedDate()"
-            [appointments]="dayAppointments()"
-            (dateChanged)="selectedDate.set($event)"
-            (apptClicked)="openAppt($event)"
-            (newAppt)="openNew($event)"
-            (apptDeletedForDoctor)="onDeleteDoctorAppts($event)" />
-        } @else {
-          <app-week-view
-            [selectedDate]="selectedDate()"
-            (dateChanged)="selectedDate.set($event)"
-            (dayClicked)="selectedDate.set($event); viewMode.set('day')"
-            (apptClicked)="openAppt($event)"
-            (newAppt)="openNew($event)" />
-        }
+        <div class="ms-right-panel">
+          <div class="ms-view-toggle">
+            <button class="ms-toggle-btn" [class.active]="viewMode() === 'day'" (click)="viewMode.set('day')">Day</button>
+            <button class="ms-toggle-btn ms-toggle-week" [class.active]="viewMode() === 'week'" (click)="viewMode.set('week')">Week</button>
+          </div>
+          @if (viewMode() === 'day') {
+            <app-day-view
+              [selectedDate]="selectedDate()"
+              [appointments]="dayAppointments()"
+              (dateChanged)="selectedDate.set($event)"
+              (apptClicked)="openAppt($event)"
+              (newAppt)="openNew($event)"
+              (apptDeletedForDoctor)="onDeleteDoctorAppts($event)" />
+          } @else {
+            <app-week-view
+              [selectedDate]="selectedDate()"
+              (dateChanged)="selectedDate.set($event)"
+              (dayClicked)="selectedDate.set($event); viewMode.set('day')"
+              (apptClicked)="openAppt($event)"
+              (newAppt)="openNew($event)" />
+          }
+        </div>
       </div>
-    </div>
-
-    @if (showSearch()) {
-      <app-patient-search
-        (closed)="showSearch.set(false)"
-        (apptClicked)="onSearchApptClicked($event)" />
-    }
-    @if (historyAppt()) {
-      <app-patient-history
-        [appointment]="historyAppt()!"
-        (closed)="historyAppt.set(null)"
-        (apptSelected)="onHistoryApptSelected($event)"
-        (viewDetails)="historyAppt.set(null); detailAppt.set($event)" />
-    }
-    @if (detailAppt()) {
-      <app-patient-details
-        [appointment]="detailAppt()!"
-        (closed)="detailAppt.set(null)"
-        (deleted)="onDelete($event); detailAppt.set(null)"
-        (edited)="onEditFromDetails($event)"
-        (statusChanged)="onStatusChange($event)"
-        (history)="detailAppt.set(null); historyAppt.set($event)"
-        (duplicated)="onDuplicate($event)" />
-    }
-    @if (modalAppt() !== undefined) {
-      <app-appointment-modal
-        [appointment]="modalAppt() ?? null"
-        [defaultHour]="defaultHour()"
-        [defaultMinute]="defaultMinute()"
-        [defaultDoctorId]="defaultDoctorId()"
-        [duplicateSource]="duplicateSource()"
-
-        [defaultDate]="selectedDate()"
-        (closed)="closeModal()"
-        (saved)="onSave($event)"
-        (deleted)="onDelete($event)" />
+      @if (showSearch()) {
+        <app-patient-search
+          (closed)="showSearch.set(false)"
+          (apptClicked)="onSearchApptClicked($event)" />
+      }
+      @if (historyAppt()) {
+        <app-patient-history
+          [appointment]="historyAppt()!"
+          (closed)="historyAppt.set(null)"
+          (apptSelected)="onHistoryApptSelected($event)"
+          (viewDetails)="historyAppt.set(null); detailAppt.set($event)" />
+      }
+      @if (detailAppt()) {
+        <app-patient-details
+          [appointment]="detailAppt()!"
+          (closed)="detailAppt.set(null)"
+          (deleted)="onDelete($event); detailAppt.set(null)"
+          (edited)="onEditFromDetails($event)"
+          (statusChanged)="onStatusChange($event)"
+          (history)="detailAppt.set(null); historyAppt.set($event)"
+          (duplicated)="onDuplicate($event)" />
+      }
+      @if (modalAppt() !== undefined) {
+        <app-appointment-modal
+          [appointment]="modalAppt() ?? null"
+          [defaultHour]="defaultHour()"
+          [defaultMinute]="defaultMinute()"
+          [defaultDoctorId]="defaultDoctorId()"
+          [duplicateSource]="duplicateSource()"
+          [defaultDate]="selectedDate()"
+          (closed)="closeModal()"
+          (saved)="onSave($event)"
+          (deleted)="onDelete($event)" />
+      }
     }
   `,
   styles: [`
@@ -117,9 +123,8 @@ import { Appointment, AppointmentStatus } from './models/appointment.model';
       --soig-appt-meta: #2D3E52;
     }
     *, *::before, *::after { box-sizing: border-box; }
-
-    /* Desktop */
     html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family: 'Inter', sans-serif; background: var(--soig-surface-2); color: var(--soig-ink); font-size: 14px; }
+    .ms-loading { height: 100vh; display: flex; align-items: center; justify-content: center; color: var(--soig-ink-3); font-size: 15px; }
     .ms-main { display: flex; height: calc(100vh - 56px); overflow: hidden; }
     .ms-left-panel { width: 240px; flex-shrink: 0; background: var(--soig-surface); border-right: 1px solid var(--soig-border); overflow-y: auto; }
     .ms-right-panel { flex: 1; background: var(--soig-surface); display: flex; flex-direction: column; overflow: hidden; }
@@ -128,8 +133,6 @@ import { Appointment, AppointmentStatus } from './models/appointment.model';
     .ms-toggle-btn.active { background: #0072D1; color: #fff; border-color: #0072D1; }
     .ms-toggle-week { display: none; }
     @media (min-width: 641px) { .ms-toggle-week { display: block; } }
-
-    /* Mobile */
     @media (max-width: 640px) {
       html, body { overflow: auto; height: auto; }
       .ms-main { flex-direction: column; height: auto; overflow: visible; }
@@ -140,10 +143,10 @@ import { Appointment, AppointmentStatus } from './models/appointment.model';
 })
 export class App {
   @ViewChild(AppointmentModalComponent) modalRef?: AppointmentModalComponent;
+  auth = inject(AuthService);
 
   @HostListener('document:keydown', ['$event'])
   onKeyDown(e: KeyboardEvent) {
-    // Ignore if typing in an input/textarea
     const tag = (e.target as HTMLElement).tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
     if (e.key === '/' || (e.ctrlKey && e.key === 'k') || (e.metaKey && e.key === 'k')) {
@@ -157,13 +160,13 @@ export class App {
       this.historyAppt.set(null);
     }
   }
+
   private docSvc = inject(DoctorService);
   detailAppt = signal<Appointment | null>(null);
   historyAppt = signal<Appointment | null>(null);
   showSearch = signal(false);
   viewMode = signal<'day' | 'week'>('day');
   private svc = inject(AppointmentService);
-
   selectedDate = signal(new Date().toISOString().split('T')[0]);
   modalAppt = signal<Appointment | null | undefined>(undefined);
   defaultHour = signal(9);
@@ -171,7 +174,6 @@ export class App {
   defaultDoctorId = signal('');
   editingId = signal<string | null>(null);
   duplicateSource = signal<Appointment | null>(null);
-
   datesWithAppts = this.svc.getDatesWithAppointments();
   dayAppointments = computed(() => this.svc.getByDate(this.selectedDate())());
 
@@ -184,7 +186,6 @@ export class App {
     this.modalAppt.set(null);
   }
   closeModal() { this.modalAppt.set(undefined); }
-
   onSave(event: { data: Partial<Appointment>; editId: string | null }) {
     const data = event.data;
     const apptData = {
@@ -211,19 +212,15 @@ export class App {
     }
     this.closeModal();
   }
-
   onDuplicate(appt: Appointment) {
     this.detailAppt.set(null);
     this.defaultHour.set(appt.hour);
     this.defaultMinute.set(appt.minute);
     this.defaultDoctorId.set(appt.doctorId);
-    // Open modal pre-filled but as new appointment
     this.editingId.set(null);
     this.modalAppt.set(null);
-    // Pre-fill form via a special signal
     this.duplicateSource.set(appt);
   }
-
   onEditFromDetails(appt: Appointment) {
     this.detailAppt.set(null);
     this.editingId.set(null);
@@ -232,28 +229,22 @@ export class App {
     this.defaultMinute.set(appt.minute);
     this.modalAppt.set(appt);
   }
-
   onDelete(id: string) { this.svc.remove(id); }
-
   onSearchApptClicked(appt: Appointment) {
     this.showSearch.set(false);
     this.selectedDate.set(appt.date);
     this.detailAppt.set(appt);
   }
-
   onHistoryApptSelected(appt: Appointment) {
     this.historyAppt.set(null);
     this.detailAppt.set(appt);
     this.selectedDate.set(appt.date);
   }
-
   onStatusChange(event: { id: string; status: AppointmentStatus }) {
     this.svc.update(event.id, { status: event.status });
-    // Update detailAppt so panel reflects new status immediately
-    const updated = this.svc.getAll().find(a => a.id === event.id);
+    const updated = this.svc.getAll().find((a) => a.id === event.id);
     if (updated) this.detailAppt.set({ ...updated });
   }
-
   onDeleteDoctorAppts(doctorId: string) {
     this.svc.removeByDoctor(doctorId);
   }

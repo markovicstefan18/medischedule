@@ -1,5 +1,6 @@
 import { Component, inject, signal, Output, EventEmitter } from '@angular/core';
 import { ThemeService } from '../../services/theme.service';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-navbar',
@@ -42,13 +43,14 @@ import { ThemeService } from '../../services/theme.service';
             </svg>
             <span class="ms-notif-dot"></span>
           </button>
-          <!-- Sign in -->
-          <button class="ms-login-btn">
+          <!-- Signed-in user + sign out -->
+          <span class="ms-user-name" [title]="auth.displayName()">{{ auth.displayName() }}</span>
+          <button class="ms-login-btn" (click)="signOut()" title="Sign out">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-              <circle cx="12" cy="7" r="4"/>
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
             </svg>
-            Sign in
+            Sign out
           </button>
         </div>
       </div>
@@ -64,12 +66,17 @@ import { ThemeService } from '../../services/theme.service';
     .ms-icon-btn:hover { background: var(--soig-surface-2); color: var(--soig-ink); }
     .ms-notif-btn { position: relative; }
     .ms-notif-dot { position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; border-radius: 50%; background: #C21016; border: 1.5px solid var(--soig-surface); }
+    .ms-user-name { font-size: 13px; color: var(--soig-ink-2); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-left: 4px; }
     .ms-login-btn { background: none; border: 1px solid var(--soig-border-2); border-radius: 6px; padding: 6px 14px; font-size: 13px; color: var(--soig-ink-2); cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 6px; margin-left: 4px; }
     .ms-login-btn:hover { background: var(--soig-surface-2); color: var(--soig-ink); }
+    @media (max-width: 640px) { .ms-user-name { display: none; } }
   `]
 })
 export class NavbarComponent {
   themeSvc = inject(ThemeService);
+  auth = inject(AuthService);
   searchOpen = signal(false);
   @Output() search = new EventEmitter<void>();
+
+  signOut() { this.auth.logout(); }
 }

@@ -1,50 +1,87 @@
-import { Injectable, signal, computed } from '@angular/core';
-import { Appointment, AppointmentType } from '../models/appointment.model';
+import { Injectable, inject, signal, computed, Injector, runInInjectionContext } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Auth, authState } from '@angular/fire/auth';
+import {
+  Firestore, collection, collectionData, query, where,
+  addDoc, updateDoc, deleteDoc, doc,
+} from '@angular/fire/firestore';
+import { Observable, of, switchMap } from 'rxjs';
+import { Appointment } from '../models/appointment.model';
 
 @Injectable({ providedIn: 'root' })
 export class AppointmentService {
-  private appointments = signal<Appointment[]>([
-    { id: '1', patientName: 'Jon Smith',    phone: '+1 555 123 4567', date: '2026-05-28', hour: 7,  minute: 0,  doctorId: 'doc1', type: 'checkup',     duration: 30,  status: 'scheduled' as const,  notes: 'Routine annual check-up. Patient has history of hypertension.', createdAt: new Date().toISOString() },
-    { id: '2', patientName: 'Jane Doe',     phone: '+1 555 987 6543', date: '2026-05-28', hour: 8,  minute: 0,  doctorId: 'doc1', type: 'preventive',  duration: 45,  status: 'confirmed' as const,  notes: 'Teeth cleaning and fluoride treatment.', createdAt: new Date().toISOString() },
-    { id: '3', patientName: 'Marko Ilić',  phone: '+381 63 555 777', date: '2026-05-28', hour: 10, minute: 15, doctorId: 'doc1', type: 'diagnostic',  duration: 60,  status: 'scheduled' as const,  notes: 'ECG and blood pressure monitoring. Follow-up required.', createdAt: new Date().toISOString() },
-    { id: '4', patientName: 'Ana Petrović',phone: '+381 64 222 333', date: '2026-05-28', hour: 13, minute: 0,  doctorId: 'doc1', type: 'restorative', duration: 90,  status: 'completed' as const,  notes: 'Composite filling on upper left molar.', createdAt: new Date().toISOString() },
-    { id: '5', patientName: 'Tom Jones',    phone: '+1 555 000 911',  date: '2026-05-28', hour: 17, minute: 0,  doctorId: 'doc1', type: 'emergency',   duration: 30,  status: 'noshow' as const,     notes: 'Severe tooth pain. X-ray needed urgently.', createdAt: new Date().toISOString() },
-    { id: '6', patientName: 'Maria Novak', phone: '+381 65 444 555', date: '2026-05-29', hour: 9,  minute: 0,  doctorId: 'doc1', type: 'checkup',     duration: 30,  status: 'scheduled' as const,  notes: 'First visit.', createdAt: new Date().toISOString() },
-    { id: '7', patientName: 'Petar Đorđić',phone: '+381 63 888 999', date: '2026-05-29', hour: 11, minute: 30, doctorId: 'doc1', type: 'preventive',  duration: 15,  status: 'confirmed' as const,  notes: 'Vaccination follow-up.', createdAt: new Date().toISOString() },
-  ]);
+  private firestore = inject(Firestore);
+  private auth = inject(Auth);
+  private injector = inject(Injector);
+  private col = collection(this.firestore, 'appointments');
+
+  private appointments = signal<Appointment[]>([]);
+  private currentUid: string | null = null;
+
+  constructor() {
+    // Runs in injection context (constructor), so no wrapping needed here.
+    authState(this.auth)
+      .pipe(
+        switchMap((user) => {
+          this.currentUid = user?.uid ?? null;
+          if (!user) return of<Appointment[]>([]);
+          const q = query(this.col, where('ownerId', '==', user.uid));
+          return collectionData(q, { idField: 'id' }) as Observable<Appointment[]>;
+        }),
+        takeUntilDestroyed()
+      )
+      .subscribe((list) => this.appointments.set(list));
+  }
 
   getAll() { return this.appointments(); }
 
   getByDate(date: string) {
-    return computed(() => this.appointments().filter(a => a.date === date));
+    return computed(() => this.appointments().filter((a) => a.date === date));
   }
 
   getDatesWithAppointments() {
-    return computed(() => new Set(this.appointments().map(a => a.date)));
+    return computed(() => new Set(this.appointments().map((a) => a.date)));
   }
 
-  add(appt: Omit<Appointment, 'id' | 'createdAt'>) {
-    this.appointments.update(list => [...list, {
-      ...appt, id: Date.now().toString(), createdAt: new Date().toISOString()
-    }]);
+  // Writes run from event handlers (outside injection context), so we wrap
+  // them with runInInjectionContext to keep AngularFire happy in a zoneless app.
+  async add(appt: Omit<Appointment, 'id' | 'createdAt'>) {
+    if (!this.currentUid) return;
+    await runInInjectionContext(this.injector, () =>
+      addDoc(this.col, {
+        ...appt,
+        ownerId: this.currentUid,
+        createdAt: new Date().toISOString(),
+      })
+    );
   }
 
-  update(id: string, changes: Partial<Appointment>) {
-    this.appointments.update(list => list.map(a => a.id === id ? { ...a, ...changes } : a));
+  async update(id: string, changes: Partial<Appointment>) {
+    const { id: _omitId, ...rest } = changes as Partial<Appointment> & { id?: string };
+    await runInInjectionContext(this.injector, () =>
+      updateDoc(doc(this.firestore, 'appointments', id), rest)
+    );
   }
 
-  remove(id: string) {
-    this.appointments.update(list => list.filter(a => a.id !== id));
+  async remove(id: string) {
+    await runInInjectionContext(this.injector, () =>
+      deleteDoc(doc(this.firestore, 'appointments', id))
+    );
   }
 
-  removeByDoctor(doctorId: string) {
-    this.appointments.update(list => list.filter(a => a.doctorId !== doctorId));
+  async removeByDoctor(doctorId: string) {
+    const matches = this.appointments().filter((a) => a.doctorId === doctorId);
+    await runInInjectionContext(this.injector, () =>
+      Promise.all(
+        matches.map((a) => deleteDoc(doc(this.firestore, 'appointments', a.id)))
+      )
+    );
   }
 
   hasOverlap(appt: Omit<Appointment, 'id' | 'createdAt'>, excludeId?: string): boolean {
     const start = Number(appt.hour) * 60 + Number(appt.minute);
     const end = start + Number(appt.duration || 30);
-    return this.appointments().some(a => {
+    return this.appointments().some((a) => {
       if (excludeId && a.id === excludeId) return false;
       if (a.date !== appt.date) return false;
       if (a.doctorId !== appt.doctorId) return false;

@@ -136,9 +136,10 @@ import { Appointment, APPOINTMENT_TYPES, APPOINTMENT_STATUSES, AppointmentStatus
     .pd-notes { font-size: 13px; color: var(--soig-ink-2); line-height: 1.7; background: var(--soig-surface-2); border-radius: 10px; padding: 12px 14px; }
 
     /* Actions */
-    .pd-actions { display: flex; gap: 8px; padding: 16px 20px; border-top: 1px solid var(--soig-border); margin-top: auto; }
+    .pd-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px 20px; border-top: 1px solid var(--soig-border); margin-top: auto; }
+    .pd-actions .pd-btn { flex: 1 1 auto; justify-content: center; white-space: nowrap; }
     .pd-btn { border-radius: 8px; padding: 9px 16px; font-size: 13px; cursor: pointer; font-family: inherit; border: 1px solid transparent; display: flex; align-items: center; gap: 6px; }
-    .pd-btn-primary { background: #0072D1; color: #fff; border-color: #0072D1; margin-left: auto; }
+    .pd-btn-primary { background: #0072D1; color: #fff; border-color: #0072D1; }
     .pd-btn-primary:hover { background: #004E8C; }
     .pd-btn-secondary { background: var(--soig-surface); color: var(--soig-ink-2); border-color: var(--soig-border-2); }
     .pd-btn-secondary:hover { background: var(--soig-surface-2); }

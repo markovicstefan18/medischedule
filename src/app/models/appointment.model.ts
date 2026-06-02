@@ -22,6 +22,7 @@ export interface Appointment {
   duration: number;
   status: AppointmentStatus; // in minutes
   createdAt: string;
+  ownerId?: string;   // Firestore: the uid of the user who owns this appointment
 }
 
 export const APPOINTMENT_TYPES: { value: AppointmentType; label: string; color: string; bg: string; border: string }[] = [
