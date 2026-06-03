@@ -266,7 +266,17 @@ export class AppointmentModalComponent implements OnInit {
     this.overlapError = false;
     // New appointments default to the selected day; edits and duplicates keep form.date.
     const date = (this.mode === 'new' && !this.isDuplicate) ? this.defaultDate : this.form.date;
-    this.saved.emit({ data: { ...this.form, date }, editId: this.editId });
+    // <select> + ngModel binds values as strings, so coerce the numeric fields.
+    this.saved.emit({
+      data: {
+        ...this.form,
+        date,
+        hour: Number(this.form.hour),
+        minute: Number(this.form.minute),
+        duration: Number(this.form.duration),
+      },
+      editId: this.editId,
+    });
   }
   onDelete() {
     if (this.appointment) {

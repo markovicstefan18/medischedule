@@ -3,7 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Auth, authState } from '@angular/fire/auth';
 import {
   Firestore, collection, collectionData, query, where,
-  addDoc, updateDoc, deleteDoc, doc,
+  doc, setDoc, updateDoc, deleteDoc,
 } from '@angular/fire/firestore';
 import { Observable, of, switchMap } from 'rxjs';
 import { Appointment } from '../models/appointment.model';
@@ -20,6 +20,7 @@ export class AppointmentService {
   private appointments = signal<Appointment[]>([]);
   private currentUid: string | null = null;
   private reassigning = false;
+  private reassignedOnce = false;
 
   constructor() {
     authState(this.auth)
@@ -36,15 +37,17 @@ export class AppointmentService {
       )
       .subscribe((list) => this.appointments.set(list));
 
-    // Self-heal: if any appointment points to a doctor that no longer exists,
-    // reassign it to the first available doctor so it stays visible.
+    // One-time self-heal: reassign appointments whose doctor no longer exists to
+    // the first available doctor. Runs ONCE per session, only after both doctors
+    // and appointments have loaded, so it never interferes with normal edits.
     effect(() => {
       const appts = this.appointments();
       const docs = this.docSvc.getAll()();
-      if (!this.currentUid || docs.length === 0 || this.reassigning) return;
+      if (!this.currentUid || this.reassignedOnce || this.reassigning) return;
+      if (docs.length === 0 || appts.length === 0) return;
       const validIds = new Set(docs.map((d) => d.id));
       const orphans = appts.filter((a) => !validIds.has(a.doctorId));
-      if (orphans.length === 0) return;
+      if (orphans.length === 0) { this.reassignedOnce = true; return; }
       this.reassigning = true;
       const target = docs[0].id;
       runInInjectionContext(this.injector, () =>
@@ -53,7 +56,7 @@ export class AppointmentService {
             updateDoc(doc(this.firestore, 'appointments', o.id), { doctorId: target })
           )
         )
-      ).finally(() => { this.reassigning = false; });
+      ).finally(() => { this.reassigning = false; this.reassignedOnce = true; });
     });
   }
 
@@ -67,14 +70,15 @@ export class AppointmentService {
     return computed(() => new Set(this.appointments().map((a) => a.date)));
   }
 
+  // Idempotent create: the document ID is generated once, then written with
+  // setDoc. Even if the underlying write fires twice, it targets the same
+  // document, so duplicates are impossible.
   async add(appt: Omit<Appointment, 'id' | 'createdAt'>) {
     if (!this.currentUid) return;
+    const uid = this.currentUid;
+    const ref = runInInjectionContext(this.injector, () => doc(this.col));
     await runInInjectionContext(this.injector, () =>
-      addDoc(this.col, {
-        ...appt,
-        ownerId: this.currentUid,
-        createdAt: new Date().toISOString(),
-      })
+      setDoc(ref, { ...appt, ownerId: uid, createdAt: new Date().toISOString() })
     );
   }
 
@@ -114,7 +118,7 @@ export class AppointmentService {
   }
 
   // Creates sample appointments spread across the provided doctor IDs, across
-  // today + the next two days. Dates are relative to today.
+  // today + the next two days. Uses idempotent setDoc writes.
   async seedSampleData(doctorIds: string[]) {
     if (!this.currentUid || doctorIds.length === 0) return;
     const today = new Date();
@@ -138,9 +142,10 @@ export class AppointmentService {
     const uid = this.currentUid;
     await runInInjectionContext(this.injector, () =>
       Promise.all(
-        samples.map((s) =>
-          addDoc(this.col, { ...s, ownerId: uid, createdAt: new Date().toISOString() })
-        )
+        samples.map((s) => {
+          const ref = doc(this.col);
+          return setDoc(ref, { ...s, ownerId: uid, createdAt: new Date().toISOString() });
+        })
       )
     );
   }
