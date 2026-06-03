@@ -2,9 +2,7 @@ import { Component, Input, Output, EventEmitter, inject, signal, computed, OnIni
 import { Appointment, APPOINTMENT_TYPES, APPOINTMENT_STATUSES, HOURS } from '../../models/appointment.model';
 import { DoctorService } from '../../services/doctor.service';
 import { DoctorModalComponent } from '../doctor-modal/doctor-modal.component';
-
 interface TimeSlot { hour: number; minute: number; isHourStart: boolean; label: string; }
-
 @Component({
   selector: 'app-day-view',
   standalone: true,
@@ -34,25 +32,22 @@ interface TimeSlot { hour: number; minute: number; isHourStart: boolean; label: 
           </button>
         </div>
       </div>
-
       <div class="ms-schedule">
-        <!-- Single scrollable container for both time col and doctor cols -->
         <!-- Day summary bar -->
-      <div class="ms-summary-bar">
-        <div class="ms-summary-item">
-          <span class="ms-summary-value">{{ appointments.length }}</span>
-          <span class="ms-summary-label">Total</span>
-        </div>
-        @for (s of summaryStats(); track s.status) {
+        <div class="ms-summary-bar">
           <div class="ms-summary-item">
-            <span class="ms-summary-value" [style.color]="s.color">{{ s.count }}</span>
-            <span class="ms-summary-label">{{ s.label }}</span>
+            <span class="ms-summary-value">{{ appointments.length }}</span>
+            <span class="ms-summary-label">Total</span>
           </div>
-        }
-      </div>
-      <div class="ms-scroll-area">
+          @for (s of summaryStats(); track s.status) {
+            <div class="ms-summary-item">
+              <span class="ms-summary-value" [style.color]="s.color">{{ s.count }}</span>
+              <span class="ms-summary-label">{{ s.label }}</span>
+            </div>
+          }
+        </div>
+        <div class="ms-scroll-area">
           <div class="ms-grid-layout">
-
             <!-- Time column — sticky left, scrolls vertically with grid -->
             <div class="ms-time-col">
               <div class="ms-time-header-spacer"></div>
@@ -65,9 +60,8 @@ interface TimeSlot { hour: number; minute: number; isHourStart: boolean; label: 
                 </div>
               }
             </div>
-
             <!-- Doctor columns -->
-            @for (doctor of docSvc.getAll()(); track doctor.id) {
+            @for (doctor of docSvc.getAll()(); track doctor.id; let isLast = $last) {
               <div class="ms-doctor-col">
                 <div class="ms-doctor-header">
                   <div class="ms-doc-avatar" [style.background]="doctor.color" [style.color]="doctor.textColor">
@@ -77,10 +71,12 @@ interface TimeSlot { hour: number; minute: number; isHourStart: boolean; label: 
                     <div class="ms-doc-name">{{ doctor.name }}</div>
                     <div class="ms-doc-spec">{{ doctor.specialty }}</div>
                   </div>
-                  <button class="ms-remove-doc-btn" (click)="confirmRemoveDoctor(doctor.id, doctor.name)" title="Remove doctor">×</button>
+                  @if (docSvc.getAll()().length > 1) {
+                    <button class="ms-remove-doc-btn" (click)="confirmRemoveDoctor(doctor.id, doctor.name)" title="Remove doctor">×</button>
+                  }
                 </div>
                 <div class="ms-col-grid">
-                    <div class="ms-col-spacer"></div>
+                  <div class="ms-col-spacer"></div>
                   @for (slot of timeSlots; track slot.hour + ':' + slot.minute) {
                     <div class="ms-grid-cell" [class.hour-start]="slot.isHourStart"
                       (click)="newAppt.emit({ hour: slot.hour, minute: slot.minute, doctorId: doctor.id }); $event.stopPropagation()">
@@ -92,7 +88,7 @@ interface TimeSlot { hour: number; minute: number; isHourStart: boolean; label: 
                     </div>
                   }
                   @for (appt of getApptsByDoctor(doctor.id); track appt.id) {
-                    <div class="ms-appt-block"
+                    <div class="ms-appt-block" [class.tip-left]="isLast && !singleDoctor()" [class.tip-top]="singleDoctor()"
                       [style.top.px]="getTopPx(appt)"
                       [style.height.px]="getHeightPx(appt)"
                       [style.background]="getType(appt.type)?.bg"
@@ -132,7 +128,6 @@ interface TimeSlot { hour: number; minute: number; isHourStart: boolean; label: 
                 </div>
               </div>
             }
-
             <!-- Add doctor column -->
             <div class="ms-add-doc-col">
               <div class="ms-add-doc-spacer"></div>
@@ -142,16 +137,13 @@ interface TimeSlot { hour: number; minute: number; isHourStart: boolean; label: 
                 </svg>
               </div>
             </div>
-
           </div>
         </div>
       </div>
     </div>
-
     @if (showDoctorModal()) {
       <app-doctor-modal (closed)="showDoctorModal.set(false)" (saved)="onAddDoctor($event)" />
     }
-
     @if (removeConfirm()) {
       <div class="ms-confirm-overlay" (click)="removeConfirm.set(null)">
         <div class="ms-confirm-box" (click)="$event.stopPropagation()">
@@ -166,6 +158,7 @@ interface TimeSlot { hour: number; minute: number; isHourStart: boolean; label: 
     }
   `,
   styles: [`
+    :host *, :host *::before, :host *::after { box-sizing: border-box; }
     :host { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
     .ms-summary-bar { display: flex; align-items: center; gap: 0; border-bottom: 1px solid var(--soig-border); background: var(--soig-surface-2); flex-shrink: 0; flex-wrap: wrap; }
     .ms-summary-item { display: flex; flex-direction: column; align-items: center; padding: 8px 16px; border-right: 1px solid var(--soig-border); min-width: 80px; }
@@ -184,12 +177,10 @@ interface TimeSlot { hour: number; minute: number; isHourStart: boolean; label: 
     .ms-print-btn { display: flex; align-items: center; gap: 5px; }
     .ms-add-btn { background: #0072D1; color: #fff; border: none; border-radius: 6px; padding: 7px 14px; font-size: 13px; cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 6px; }
     .ms-add-btn:hover { background: #004E8C; }
-
-    /* Single scroll container */
-    .ms-schedule { flex: 1; overflow: hidden; }
-    .ms-scroll-area { width: 100%; height: 100%; overflow: auto; }
+    /* Schedule is a flex column: summary bar on top, scroll area fills the rest */
+    .ms-schedule { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+    .ms-scroll-area { flex: 1; width: 100%; overflow: auto; }
     .ms-grid-layout { display: flex; min-width: max-content; }
-
     /* Time column — sticky left */
     .ms-time-col { width: 64px; flex-shrink: 0; display: flex; flex-direction: column; border-right: 1px solid var(--soig-border); position: sticky; left: 0; z-index: 10; background: var(--soig-surface); }
     .ms-time-header-spacer { height: 45px; flex-shrink: 0; border-bottom: 1px solid var(--soig-border); position: sticky; top: 0; z-index: 11; background: var(--soig-surface); }
@@ -198,7 +189,6 @@ interface TimeSlot { hour: number; minute: number; isHourStart: boolean; label: 
     .ms-time-cell { height: 20px; display: flex; align-items: flex-start; justify-content: flex-end; padding-right: 8px; }
     .ms-time-cell.hour-start { border-top: 1px solid var(--soig-border); }
     .ms-time-label { font-size: 13px; font-weight: 500; color: var(--soig-ink-2); margin-top: -11px; display: flex; align-items: center; justify-content: center; width: 48px; height: 22px; border-radius: 11px; background: var(--ms-hour-bg, #ffffff); }
-
     /* Doctor columns */
     .ms-doctor-col { min-width: 180px; flex: 1; display: flex; flex-direction: column; border-right: 1px solid var(--soig-border); overflow: visible; }
     .ms-doctor-header { height: 45px; flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 0 8px; border-bottom: 1px solid var(--soig-border); background: var(--soig-surface-2); position: sticky; top: 0; z-index: 9; }
@@ -208,20 +198,20 @@ interface TimeSlot { hour: number; minute: number; isHourStart: boolean; label: 
     .ms-doc-spec { font-size: 10px; color: var(--soig-ink-3); }
     .ms-remove-doc-btn { background: none; border: none; cursor: pointer; color: var(--soig-ink-3); font-size: 18px; line-height: 1; padding: 0 2px; flex-shrink: 0; }
     .ms-remove-doc-btn:hover { color: #C21016; }
-
     /* Grid */
     .ms-col-grid { position: relative; flex: 1; overflow: visible; }
     .ms-grid-cell { height: 20px; border-top: 1px solid transparent; cursor: pointer; }
     .ms-grid-cell.hour-start { border-top-color: var(--soig-border); }
     .ms-grid-cell:not(.hour-start) { border-top: 1px dashed var(--soig-border); }
     .ms-grid-cell:hover { background: var(--soig-surface-2); }
-
     /* Appointments */
     .ms-current-time-line { position: absolute; left: 0; right: 0; height: 2px; background: #E24B4A; z-index: 5; pointer-events: none; }
     .ms-current-time-dot { position: absolute; left: -4px; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: #E24B4A; }
     .ms-appt-block { position: absolute; left: 3px; right: 3px; border-left: 3px solid; border-radius: 0 6px 6px 0; padding: 3px 6px; cursor: pointer; overflow: hidden; z-index: 2; transition: opacity 0.1s; min-height: 20px; }
-    .ms-appt-block:hover { opacity: 0.85; z-index: 30; overflow: visible; }
+    .ms-appt-block:hover { opacity: 0.85; z-index: 999; overflow: visible; }
     .ms-appt-tooltip { display: none; position: absolute; left: calc(100% + 8px); top: 0; width: 200px; background: var(--soig-surface); border: 1px solid var(--soig-border-2); border-radius: 8px; padding: 10px 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); z-index: 100; pointer-events: none; }
+    .ms-appt-block.tip-left .ms-appt-tooltip { left: auto; right: calc(100% + 8px); }
+    .ms-appt-block.tip-top .ms-appt-tooltip { left: 0; right: auto; top: auto; bottom: calc(100% + 8px); }
     .ms-appt-block:hover .ms-appt-tooltip { display: block; }
     .ms-tt-name { font-size: 13px; font-weight: 600; color: var(--soig-ink); margin-bottom: 6px; }
     .ms-tt-row { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--soig-ink-2); padding: 2px 0; }
@@ -231,13 +221,11 @@ interface TimeSlot { hour: number; minute: number; isHourStart: boolean; label: 
     .ms-appt-name { font-size: 11px; font-weight: 600; color: var(--soig-appt-name, #1B2A3B); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
     .ms-appt-status-dot { font-size: 11px; flex-shrink: 0; line-height: 1; }
     .ms-appt-meta { font-size: 10px; color: var(--soig-appt-meta, #4A5568); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
     /* Add doctor column */
     .ms-add-doc-col { width: 52px; flex-shrink: 0; display: flex; flex-direction: column; border-left: 1px dashed var(--soig-border); }
     .ms-add-doc-spacer { height: 45px; flex-shrink: 0; border-bottom: 1px solid var(--soig-border); position: sticky; top: 0; background: var(--soig-surface); }
     .ms-add-doc-btn { width: 32px; height: 32px; border-radius: 50%; border: 1.5px dashed var(--soig-border-2); display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--soig-ink-3); transition: all 0.15s; margin: 10px auto 0; }
     .ms-add-doc-btn:hover { border-color: #0072D1; color: #0072D1; background: #E8F4FF; }
-
     /* Confirm dialog */
     .ms-confirm-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 1rem; }
     .ms-confirm-box { background: var(--soig-surface); border-radius: 12px; border: 1px solid var(--soig-border); width: 100%; max-width: 380px; padding: 20px; }
@@ -262,11 +250,10 @@ export class DayViewComponent implements OnInit, OnDestroy {
   @Output() apptClicked = new EventEmitter<Appointment>();
   @Output() newAppt = new EventEmitter<{ hour: number; minute: number; doctorId: string }>();
   @Output() apptDeletedForDoctor = new EventEmitter<string>();
-
   docSvc = inject(DoctorService);
   showDoctorModal = signal(false);
   removeConfirm = signal<{ id: string; name: string } | null>(null);
-
+  singleDoctor = computed(() => this.docSvc.getAll()().length === 1);
   summaryStats = computed(() => {
     return APPOINTMENT_STATUSES.map(s => ({
       status: s.value,
@@ -275,26 +262,20 @@ export class DayViewComponent implements OnInit, OnDestroy {
       count: this._appointments().filter(a => a.status === s.value).length
     })).filter(s => s.count > 0);
   });
-
   currentTimeTop = signal<number | null>(null);
   private timeInterval: any = null;
-
   readonly SLOT_HEIGHT = 20;
   timeSlots: TimeSlot[] = this.buildSlots();
-
   ngOnInit() {
     this.updateCurrentTime();
     this.timeInterval = setInterval(() => this.updateCurrentTime(), 60000);
   }
-
   ngOnDestroy() {
     if (this.timeInterval) clearInterval(this.timeInterval);
   }
-
   isToday(): boolean {
     return this._selectedDate() === this.toDateStr(new Date());
   }
-
   updateCurrentTime() {
     const now = new Date();
     const hour = now.getHours();
@@ -308,7 +289,6 @@ export class DayViewComponent implements OnInit, OnDestroy {
                 this.SLOT_HEIGHT; // spacer
     this.currentTimeTop.set(top);
   }
-
   buildSlots(): TimeSlot[] {
     const slots: TimeSlot[] = [];
     for (const h of HOURS) {
@@ -320,24 +300,19 @@ export class DayViewComponent implements OnInit, OnDestroy {
     }
     return slots;
   }
-
   getApptsByDoctor(doctorId: string) {
     return this._appointments().filter(a => a.doctorId === doctorId);
   }
-
   getTopPx(appt: Appointment): number {
     const hourOffset = (appt.hour - HOURS[0]) * 4;
     const minuteOffset = appt.minute / 15;
     return (hourOffset + minuteOffset) * this.SLOT_HEIGHT + this.SLOT_HEIGHT; // +SLOT_HEIGHT for top spacer
   }
-
   getHeightPx(appt: Appointment): number {
     return Math.max((appt.duration || 30) / 15 * this.SLOT_HEIGHT, this.SLOT_HEIGHT);
   }
-
   getType(type: string) { return APPOINTMENT_TYPES.find(t => t.value === type); }
   getStatus(status: string) { return APPOINTMENT_STATUSES.find(s => s.value === status); }
-
   getDurationLabel(duration: number) {
     if (!duration) return '';
     if (duration < 60) return duration + ' min';
@@ -345,21 +320,17 @@ export class DayViewComponent implements OnInit, OnDestroy {
     const m = duration % 60;
     return m ? `${h}h ${m}min` : `${h}h`;
   }
-
   formattedDate() {
     if (!this.selectedDate) return '';
     const [y, mo, d] = this.selectedDate.split('-').map(Number);
     return new Date(y, mo - 1, d).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
   }
-
   formatTime(hour: number, minute: number) {
     const ampm = hour >= 12 ? 'PM' : 'AM';
     const h = hour > 12 ? hour - 12 : hour;
     return `${h}:${minute.toString().padStart(2, '0')} ${ampm}`;
   }
-
   confirmRemoveDoctor(id: string, name: string) { this.removeConfirm.set({ id, name }); }
-
   onRemoveDoctor() {
     const confirm = this.removeConfirm();
     if (!confirm) return;
@@ -367,20 +338,15 @@ export class DayViewComponent implements OnInit, OnDestroy {
     this.docSvc.remove(confirm.id);
     this.removeConfirm.set(null);
   }
-
   onAddDoctor(data: { name: string; specialty: string }) { this.docSvc.add(data.name, data.specialty); }
-
   goToday() {
     this.dateChanged.emit(this.toDateStr(new Date()));
   }
-
   printSchedule() {
     const appts = [...this._appointments()]
       .sort((a, b) => a.hour !== b.hour ? a.hour - b.hour : a.minute - b.minute);
-
     const doc = this.docSvc.getAll()();
     const dateStr = this.formattedDate();
-
     const rows = appts.map(a => {
       const type = this.getType(a.type);
       const status = this.getStatus(a.status);
@@ -398,7 +364,6 @@ export class DayViewComponent implements OnInit, OnDestroy {
         <td>${a.notes || ''}</td>
       </tr>`;
     }).join('');
-
     const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -435,7 +400,6 @@ export class DayViewComponent implements OnInit, OnDestroy {
   </table>
 </body>
 </html>`;
-
     const win = window.open('', '_blank');
     if (win) {
       win.document.write(html);
@@ -444,17 +408,14 @@ export class DayViewComponent implements OnInit, OnDestroy {
       setTimeout(() => win.print(), 500);
     }
   }
-
   prevDay() {
     const [y, m, d] = this.selectedDate.split('-').map(Number);
     this.dateChanged.emit(this.toDateStr(new Date(y, m - 1, d - 1)));
   }
-
   nextDay() {
     const [y, m, d] = this.selectedDate.split('-').map(Number);
     this.dateChanged.emit(this.toDateStr(new Date(y, m - 1, d + 1)));
   }
-
   toDateStr(d: Date): string {
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }

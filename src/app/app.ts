@@ -37,6 +37,14 @@ import { Appointment, AppointmentStatus } from './models/appointment.model';
             <button class="ms-toggle-btn" [class.active]="viewMode() === 'day'" (click)="viewMode.set('day')">Day</button>
             <button class="ms-toggle-btn ms-toggle-week" [class.active]="viewMode() === 'week'" (click)="viewMode.set('week')">Week</button>
           </div>
+          @if (hasNoAppointments()) {
+            <div class="ms-empty-banner">
+              <span>No appointments yet.</span>
+              <button (click)="loadSampleData()" [disabled]="seeding()">
+                {{ seeding() ? 'Loading…' : 'Load sample data' }}
+              </button>
+            </div>
+          }
           @if (viewMode() === 'day') {
             <app-day-view
               [selectedDate]="selectedDate()"
@@ -125,6 +133,9 @@ import { Appointment, AppointmentStatus } from './models/appointment.model';
     *, *::before, *::after { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family: 'Inter', sans-serif; background: var(--soig-surface-2); color: var(--soig-ink); font-size: 14px; }
     .ms-loading { height: 100vh; display: flex; align-items: center; justify-content: center; color: var(--soig-ink-3); font-size: 15px; }
+    .ms-empty-banner { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 14px 16px; background: var(--soig-surface-2); border-bottom: 1px solid var(--soig-border); font-size: 13px; color: var(--soig-ink-2); flex-shrink: 0; }
+    .ms-empty-banner button { background: var(--soig-accent); color: #fff; border: none; border-radius: 6px; padding: 7px 16px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+    .ms-empty-banner button:disabled { opacity: 0.6; cursor: default; }
     .ms-main { display: flex; height: calc(100vh - 56px); overflow: hidden; }
     .ms-left-panel { width: 240px; flex-shrink: 0; background: var(--soig-surface); border-right: 1px solid var(--soig-border); overflow-y: auto; }
     .ms-right-panel { flex: 1; background: var(--soig-surface); display: flex; flex-direction: column; overflow: hidden; }
@@ -176,12 +187,15 @@ export class App {
   duplicateSource = signal<Appointment | null>(null);
   datesWithAppts = this.svc.getDatesWithAppointments();
   dayAppointments = computed(() => this.svc.getByDate(this.selectedDate())());
+  seeding = signal(false);
+  hasNoAppointments = computed(() => this.svc.getAll().length === 0);
 
   openAppt(appt: Appointment) { this.detailAppt.set(appt); }
-  openNew(slot: { hour: number; minute: number; doctorId: string }) {
+  openNew(slot: { hour: number; minute: number; doctorId: string; date?: string }) {
     this.defaultHour.set(slot.hour);
     this.defaultMinute.set(slot.minute);
     this.defaultDoctorId.set(slot.doctorId);
+    if (slot.date) this.selectedDate.set(slot.date);
     this.duplicateSource.set(null);
     this.modalAppt.set(null);
   }
@@ -247,5 +261,15 @@ export class App {
   }
   onDeleteDoctorAppts(doctorId: string) {
     this.svc.removeByDoctor(doctorId);
+  }
+
+  async loadSampleData() {
+    this.seeding.set(true);
+    try {
+      const doctorIds = await this.docSvc.ensureSampleDoctors();
+      await this.svc.seedSampleData(doctorIds);
+    } finally {
+      this.seeding.set(false);
+    }
   }
 }

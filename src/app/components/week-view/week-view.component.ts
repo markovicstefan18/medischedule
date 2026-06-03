@@ -3,9 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Appointment, APPOINTMENT_TYPES, APPOINTMENT_STATUSES, HOURS } from '../../models/appointment.model';
 import { DoctorService } from '../../services/doctor.service';
 import { AppointmentService } from '../../services/appointment.service';
-
 interface WeekDay { date: string; dayName: string; dayNum: number; monthShort: string; isToday: boolean; }
-
 @Component({
   selector: 'app-week-view',
   standalone: true,
@@ -34,67 +32,73 @@ interface WeekDay { date: string; dayName: string; dayNum: number; monthShort: s
         </div>
       </div>
 
+      <!-- Single scroll container; headers + time column pinned via sticky -->
       <div class="wv-schedule">
-        <div class="wv-time-col">
-          <div class="wv-time-spacer"></div>
-          <div class="wv-slot-spacer"></div>
-          @for (slot of timeSlots; track slot.hour + ':' + slot.minute) {
-            <div class="wv-time-cell" [class.hour-start]="slot.isHourStart">
-              @if (slot.isHourStart) {
-                <span class="wv-time-label">{{ slot.label }}</span>
-              }
+        <div class="wv-grid">
+          <!-- Top-left corner (pinned both directions) -->
+          <div class="wv-corner"></div>
+
+          <!-- Day headers (pinned to top) -->
+          @for (day of weekDays(); track day.date) {
+            <div class="wv-day-header" [class.today]="day.isToday" (click)="dayClicked.emit(day.date)">
+              <div class="wv-day-name">{{ day.dayName }}</div>
+              <div class="wv-day-num">{{ day.dayNum }}</div>
+              <div class="wv-day-count">{{ getDayAppts(day.date).length || '' }}</div>
             </div>
           }
-        </div>
 
-        <div class="wv-days-scroll">
-          <div class="wv-days-inner">
-            @for (day of weekDays(); track day.date) {
-              <div class="wv-day-col">
-                <div class="wv-day-header" [class.today]="day.isToday" (click)="dayClicked.emit(day.date)">
-                  <div class="wv-day-name">{{ day.dayName }}</div>
-                  <div class="wv-day-num">{{ day.dayNum }}</div>
-                  <div class="wv-day-count">{{ getDayAppts(day.date).length || '' }}</div>
-                </div>
-                <div class="wv-col-grid">
-                  <div class="wv-col-spacer"></div>
-                  @for (slot of timeSlots; track slot.hour + ':' + slot.minute) {
-                    <div class="wv-grid-cell" [class.hour-start]="slot.isHourStart"
-                      (click)="newAppt.emit({ hour: slot.hour, minute: slot.minute, doctorId: selectedDoctorId })">
-                    </div>
-                  }
-                  @for (appt of getDayAppts(day.date); track appt.id) {
-                    <div class="wv-appt"
-                      [style.top.px]="getTopPx(appt)"
-                      [style.height.px]="getHeightPx(appt)"
-                      [style.background]="getType(appt.type)?.bg"
-                      [style.border-left-color]="getType(appt.type)?.border"
-                      (click)="apptClicked.emit(appt); $event.stopPropagation()">
-                      <div class="wv-appt-name">{{ appt.patientName }}</div>
-                      <div class="wv-appt-time">{{ formatTime(appt.hour, appt.minute) }}</div>
-                      <div class="wv-appt-tooltip">
-                        <div class="wv-tt-name">{{ appt.patientName }}</div>
-                        <div class="wv-tt-row"><span class="wv-tt-label">Time</span><span>{{ formatTime(appt.hour, appt.minute) }}</span></div>
-                        <div class="wv-tt-row"><span class="wv-tt-label">Type</span><span [style.color]="getType(appt.type)?.color">{{ getType(appt.type)?.label }}</span></div>
-                        @if (appt.phone) {<div class="wv-tt-row"><span class="wv-tt-label">Phone</span><span>{{ appt.phone }}</span></div>}
-                        @if (appt.notes) {<div class="wv-tt-notes">{{ appt.notes }}</div>}
-                      </div>
-                    </div>
-                  }
-                  @if (day.isToday && currentTimeTop() !== null) {
-                    <div class="wv-current-time" [style.top.px]="currentTimeTop()!">
-                      <div class="wv-current-dot"></div>
-                    </div>
-                  }
-                </div>
+          <!-- Time column (pinned to left, scrolls vertically with rows) -->
+          <div class="wv-time-col">
+            <div class="wv-slot-spacer"></div>
+            @for (slot of timeSlots; track slot.hour + ':' + slot.minute) {
+              <div class="wv-time-cell" [class.hour-start]="slot.isHourStart">
+                @if (slot.isHourStart) {
+                  <span class="wv-time-label">{{ slot.label }}</span>
+                }
               </div>
             }
           </div>
+
+          <!-- Day columns -->
+          @for (day of weekDays(); track day.date; let isLast = $last) {
+            <div class="wv-col-grid">
+              <div class="wv-col-spacer"></div>
+              @for (slot of timeSlots; track slot.hour + ':' + slot.minute) {
+                <div class="wv-grid-cell" [class.hour-start]="slot.isHourStart"
+                  (click)="newAppt.emit({ hour: slot.hour, minute: slot.minute, doctorId: selectedDoctorId, date: day.date })">
+                </div>
+              }
+              @for (appt of getDayAppts(day.date); track appt.id) {
+                <div class="wv-appt" [class.tip-left]="isLast"
+                  [style.top.px]="getTopPx(appt)"
+                  [style.height.px]="getHeightPx(appt)"
+                  [style.background]="getType(appt.type)?.bg"
+                  [style.border-left-color]="getType(appt.type)?.border"
+                  (click)="apptClicked.emit(appt); $event.stopPropagation()">
+                  <div class="wv-appt-name">{{ appt.patientName }}</div>
+                  <div class="wv-appt-time">{{ formatTime(appt.hour, appt.minute) }}</div>
+                  <div class="wv-appt-tooltip">
+                    <div class="wv-tt-name">{{ appt.patientName }}</div>
+                    <div class="wv-tt-row"><span class="wv-tt-label">Time</span><span>{{ formatTime(appt.hour, appt.minute) }}</span></div>
+                    <div class="wv-tt-row"><span class="wv-tt-label">Type</span><span [style.color]="getType(appt.type)?.color">{{ getType(appt.type)?.label }}</span></div>
+                    @if (appt.phone) {<div class="wv-tt-row"><span class="wv-tt-label">Phone</span><span>{{ appt.phone }}</span></div>}
+                    @if (appt.notes) {<div class="wv-tt-notes">{{ appt.notes }}</div>}
+                  </div>
+                </div>
+              }
+              @if (day.isToday && currentTimeTop() !== null) {
+                <div class="wv-current-time" [style.top.px]="currentTimeTop()!">
+                  <div class="wv-current-dot"></div>
+                </div>
+              }
+            </div>
+          }
         </div>
       </div>
     </div>
   `,
   styles: [`
+    :host *, :host *::before, :host *::after { box-sizing: border-box; }
     :host { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
     .wv-wrap { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
     .wv-header { padding: 10px 16px; border-bottom: 1px solid var(--soig-border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; flex-shrink: 0; }
@@ -108,20 +112,30 @@ interface WeekDay { date: string; dayName: string; dayNum: number; monthShort: s
     .wv-add-btn { background: #0072D1; color: #fff; border: none; border-radius: 6px; padding: 6px 12px; font-size: 13px; cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 5px; }
     .wv-add-btn:hover { background: #004E8C; }
 
-    .wv-schedule { flex: 1; overflow: hidden; display: flex; }
-    .wv-time-col { width: 56px; flex-shrink: 0; display: flex; flex-direction: column; border-right: 1px solid var(--soig-border); position: sticky; left: 0; z-index: 10; background: var(--soig-surface); }
-    .wv-time-spacer { height: 52px; flex-shrink: 0; border-bottom: 1px solid var(--soig-border); position: sticky; top: 0; z-index: 11; background: var(--soig-surface); }
-    .wv-slot-spacer { height: 20px; }
-    .wv-time-cell { height: 20px; display: flex; align-items: flex-start; justify-content: flex-end; padding-right: 6px; }
-    .wv-time-cell.hour-start { border-top: 1px solid var(--soig-border); }
-    .wv-time-label { font-size: 11px; font-weight: 500; color: var(--soig-ink-2); margin-top: -9px; display: flex; align-items: center; justify-content: center; width: 44px; height: 20px; border-radius: 10px; background: var(--ms-hour-bg, #fff); }
+    /* The one scroll container for both axes */
+    .wv-schedule { flex: 1; overflow: auto; }
+    .wv-grid {
+      display: grid;
+      grid-template-columns: 56px repeat(7, minmax(120px, 1fr));
+      grid-template-rows: 52px auto;
+      min-width: max-content;
+    }
 
-    .wv-days-scroll { flex: 1; overflow: auto; }
-    .wv-days-inner { display: flex; min-width: max-content; min-height: 100%; }
+    /* Pinned corner (top + left) */
+    .wv-corner {
+      position: sticky; top: 0; left: 0; z-index: 12;
+      background: var(--soig-surface);
+      border-right: 1px solid var(--soig-border);
+      border-bottom: 1px solid var(--soig-border);
+    }
 
-    .wv-day-col { min-width: 120px; flex: 1; display: flex; flex-direction: column; border-right: 1px solid var(--soig-border); overflow: visible; }
-    .wv-day-col:last-child { border-right: none; }
-    .wv-day-header { height: 52px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; border-bottom: 1px solid var(--soig-border); background: var(--soig-surface-2); cursor: pointer; position: sticky; top: 0; z-index: 9; }
+    /* Day headers pinned to top */
+    .wv-day-header {
+      position: sticky; top: 0; z-index: 9;
+      height: 52px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      border-bottom: 1px solid var(--soig-border); border-right: 1px solid var(--soig-border);
+      background: var(--soig-surface-2); cursor: pointer;
+    }
     .wv-day-header:hover { background: var(--soig-surface-3); }
     .wv-day-header.today { background: #E6F1FB; }
     .wv-day-name { font-size: 10px; color: var(--soig-ink-3); text-transform: uppercase; letter-spacing: 0.4px; }
@@ -129,7 +143,21 @@ interface WeekDay { date: string; dayName: string; dayNum: number; monthShort: s
     .wv-day-header.today .wv-day-num { color: #0072D1; }
     .wv-day-count { font-size: 10px; color: var(--soig-ink-3); height: 12px; }
 
-    .wv-col-grid { position: relative; flex: 1; overflow: visible; }
+    /* Time column pinned to left, scrolls vertically with the rows */
+    .wv-time-col {
+      position: sticky; left: 0; z-index: 10;
+      background: var(--soig-surface);
+      border-right: 1px solid var(--soig-border);
+      display: flex; flex-direction: column;
+    }
+    .wv-slot-spacer { height: 20px; }
+    .wv-time-cell { height: 20px; display: flex; align-items: flex-start; justify-content: flex-end; padding-right: 6px; }
+    .wv-time-cell.hour-start { border-top: 1px solid var(--soig-border); }
+    .wv-time-label { font-size: 11px; font-weight: 500; color: var(--soig-ink-2); margin-top: -9px; display: flex; align-items: center; justify-content: center; width: 44px; height: 20px; border-radius: 10px; background: var(--ms-hour-bg, #fff); }
+
+    /* Day columns */
+    .wv-col-grid { position: relative; border-right: 1px solid var(--soig-border); overflow: visible; }
+    .wv-col-grid:last-child { border-right: none; }
     .wv-col-spacer { height: 20px; }
     .wv-grid-cell { height: 20px; cursor: pointer; }
     .wv-grid-cell.hour-start { border-top: 1px solid var(--soig-border); }
@@ -137,16 +165,16 @@ interface WeekDay { date: string; dayName: string; dayNum: number; monthShort: s
     .wv-grid-cell:hover { background: var(--soig-surface-2); }
 
     .wv-appt { position: absolute; left: 2px; right: 2px; border-left: 3px solid; border-radius: 0 4px 4px 0; padding: 2px 5px; cursor: pointer; overflow: hidden; z-index: 2; min-height: 20px; transition: opacity 0.1s; }
-    .wv-appt:hover { opacity: 0.85; z-index: 30; overflow: visible; }
+    .wv-appt:hover { opacity: 0.85; z-index: 999; overflow: visible; }
     .wv-appt-tooltip { display: none; position: absolute; left: calc(100% + 6px); top: 0; width: 180px; background: var(--soig-surface); border: 1px solid var(--soig-border-2); border-radius: 8px; padding: 10px 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); z-index: 100; pointer-events: none; }
     .wv-appt:hover .wv-appt-tooltip { display: block; }
+    .wv-appt.tip-left .wv-appt-tooltip { left: auto; right: calc(100% + 6px); }
     .wv-tt-name { font-size: 12px; font-weight: 600; color: var(--soig-ink); margin-bottom: 5px; }
     .wv-tt-row { display: flex; justify-content: space-between; gap: 6px; font-size: 11px; color: var(--soig-ink-2); padding: 1px 0; }
     .wv-tt-label { color: var(--soig-ink-3); flex-shrink: 0; }
     .wv-tt-notes { font-size: 11px; color: var(--soig-ink-2); margin-top: 5px; padding-top: 5px; border-top: 1px solid var(--soig-border); line-height: 1.5; }
     .wv-appt-name { font-size: 11px; font-weight: 600; color: var(--soig-appt-name, #1B2A3B); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .wv-appt-time { font-size: 10px; color: var(--soig-appt-meta, #4A5568); }
-
     .wv-current-time { position: absolute; left: 0; right: 0; height: 2px; background: #E24B4A; z-index: 5; pointer-events: none; }
     .wv-current-dot { position: absolute; left: -4px; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: #E24B4A; }
   `]
@@ -158,33 +186,26 @@ export class WeekViewComponent implements OnInit, OnDestroy {
   @Output() dateChanged = new EventEmitter<string>();
   @Output() dayClicked = new EventEmitter<string>();
   @Output() apptClicked = new EventEmitter<Appointment>();
-  @Output() newAppt = new EventEmitter<{ hour: number; minute: number; doctorId: string }>();
-
+  @Output() newAppt = new EventEmitter<{ hour: number; minute: number; doctorId: string; date?: string }>();
   docSvc = inject(DoctorService);
   private svc = inject(AppointmentService);
-
   selectedDoctorId = '';
   currentTimeTop = signal<number | null>(null);
   private timeInterval: any = null;
-
   readonly SLOT_HEIGHT = 20;
   timeSlots = this.buildSlots();
-
   ngOnInit() {
     this.selectedDoctorId = this.docSvc.getAll()()[0]?.id || '';
     this.updateCurrentTime();
     this.timeInterval = setInterval(() => this.updateCurrentTime(), 60000);
   }
-
   ngOnDestroy() { if (this.timeInterval) clearInterval(this.timeInterval); }
-
   updateCurrentTime() {
     const now = new Date();
     const h = now.getHours(); const m = now.getMinutes();
     if (h < HOURS[0] || h > HOURS[HOURS.length - 1]) { this.currentTimeTop.set(null); return; }
     this.currentTimeTop.set((h - HOURS[0]) * 4 * this.SLOT_HEIGHT + (m / 15) * this.SLOT_HEIGHT + this.SLOT_HEIGHT);
   }
-
   weekDays = computed(() => {
     const [y, mo, d] = this._selectedDate().split('-').map(Number);
     const date = new Date(y, mo - 1, d);
@@ -202,7 +223,6 @@ export class WeekViewComponent implements OnInit, OnDestroy {
       };
     });
   });
-
   weekRange = computed(() => {
     const days = this.weekDays();
     if (!days.length) return '';
@@ -213,11 +233,9 @@ export class WeekViewComponent implements OnInit, OnDestroy {
     const l = lastDate.toLocaleString('default', { month: 'short', day: 'numeric', year: 'numeric' });
     return `${f} – ${l}`;
   });
-
   getDayAppts(date: string) {
     return this.svc.getAll().filter(a => a.date === date && a.doctorId === this.selectedDoctorId);
   }
-
   buildSlots() {
     const slots: any[] = [];
     for (const h of HOURS) {
@@ -229,35 +247,27 @@ export class WeekViewComponent implements OnInit, OnDestroy {
     }
     return slots;
   }
-
   getTopPx(appt: Appointment): number {
     return (appt.hour - HOURS[0]) * 4 * this.SLOT_HEIGHT + (appt.minute / 15) * this.SLOT_HEIGHT + this.SLOT_HEIGHT;
   }
-
   getHeightPx(appt: Appointment): number {
     return Math.max((appt.duration || 30) / 15 * this.SLOT_HEIGHT, this.SLOT_HEIGHT);
   }
-
   getType(type: string) { return APPOINTMENT_TYPES.find(t => t.value === type); }
-
   formatTime(hour: number, minute: number) {
     const ampm = hour >= 12 ? 'PM' : 'AM';
     const h = hour > 12 ? hour - 12 : hour;
     return `${h}:${minute.toString().padStart(2, '0')} ${ampm}`;
   }
-
   prevWeek() {
     const [y, m, d] = this._selectedDate().split('-').map(Number);
     this.dateChanged.emit(this.toDateStr(new Date(y, m - 1, d - 7)));
   }
-
   nextWeek() {
     const [y, m, d] = this._selectedDate().split('-').map(Number);
     this.dateChanged.emit(this.toDateStr(new Date(y, m - 1, d + 7)));
   }
-
   goToday() { this.dateChanged.emit(this.toDateStr(new Date())); }
-
   toDateStr(d: Date): string {
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
