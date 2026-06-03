@@ -2,7 +2,6 @@ import { Component, Input, Output, EventEmitter, OnInit, inject } from '@angular
 import { FormsModule } from '@angular/forms';
 import { Appointment, AppointmentType, APPOINTMENT_TYPES, HOURS, DURATIONS, MINUTES } from '../../models/appointment.model';
 import { DoctorService } from '../../services/doctor.service';
-
 @Component({
   selector: 'app-appointment-modal',
   standalone: true,
@@ -18,7 +17,6 @@ import { DoctorService } from '../../services/doctor.service';
             </svg>
           </button>
         </div>
-
         @if (mode === 'view' && appointment) {
           <div class="ms-modal-body">
             <div class="ms-detail-row">
@@ -53,7 +51,6 @@ import { DoctorService } from '../../services/doctor.service';
             <button class="ms-btn ms-btn-secondary" (click)="switchToEdit()">Edit</button>
           </div>
         }
-
         @if (mode === 'edit' || mode === 'new') {
           <div class="ms-modal-body">
             <div class="ms-form-field">
@@ -201,16 +198,13 @@ export class AppointmentModalComponent implements OnInit {
   @Output() saved = new EventEmitter<{ data: Partial<Appointment>; editId: string | null }>();
   overlapError = false;
   @Output() deleted = new EventEmitter<string>();
-
   docSvc = inject(DoctorService);
   mode: 'view' | 'edit' | 'new' = 'view';
   types = APPOINTMENT_TYPES;
   hours = HOURS;
   minutes = MINUTES;
   durations = DURATIONS;
-
   isDuplicate = false;
-
   form = {
     patientName: '',
     phone: '',
@@ -222,7 +216,6 @@ export class AppointmentModalComponent implements OnInit {
     notes: '',
     doctorId: '',
   };
-
   ngOnInit() {
     if (this.appointment) {
       this.switchToEdit();
@@ -234,9 +227,7 @@ export class AppointmentModalComponent implements OnInit {
       this.form.doctorId = this.defaultDoctorId;
     }
   }
-
   editId: string | null = null;
-
   switchToEdit() {
     if (this.appointment) {
       this.editId = this.appointment.id;
@@ -254,43 +245,36 @@ export class AppointmentModalComponent implements OnInit {
       this.mode = 'edit';
     }
   }
-
   getType(type: AppointmentType) {
     return APPOINTMENT_TYPES.find(t => t.value === type);
   }
-
   getDurationLabel(duration: number) {
     return DURATIONS.find(d => d.value === duration)?.label || `${duration} min`;
   }
-
   formatTime(hour: number, minute: number) {
     const ampm = hour >= 12 ? 'PM' : 'AM';
     const h = hour > 12 ? hour - 12 : hour;
     return `${h}:${minute.toString().padStart(2, '0')} ${ampm}`;
   }
-
   formatHour(h: number) {
     const ampm = h >= 12 ? 'PM' : 'AM';
     const hour = h > 12 ? h - 12 : h;
     return `${hour} ${ampm}`;
   }
-
   onSave() {
     if (!this.form.patientName) return;
     this.overlapError = false;
-    const date = this.isDuplicate ? this.form.date : this.defaultDate;
+    // New appointments default to the selected day; edits and duplicates keep form.date.
+    const date = (this.mode === 'new' && !this.isDuplicate) ? this.defaultDate : this.form.date;
     this.saved.emit({ data: { ...this.form, date }, editId: this.editId });
   }
-
   onDelete() {
     if (this.appointment) {
       this.deleted.emit(this.appointment.id);
       this.closed.emit();
     }
   }
-
   setOverlapError(val: boolean) { this.overlapError = val; }
-
   onOverlayClick(e: MouseEvent) {
     if ((e.target as HTMLElement).classList.contains('ms-modal-overlay')) {
       this.closed.emit();
